@@ -1,0 +1,67 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "main" && $CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: never
+    - when: always
+
+variables:
+  SERVER_HOST: 13.127.12.254
+
+stages:
+  - test
+  - build 
+  - deploy
+
+run_unit_tests:
+  stage: test
+  tags:
+    - ec2
+    - docker
+    - remote
+  image: node:16-alpine
+  before_script:
+    - cd app
+    - npm install
+  script:
+    - npm test
+  artifacts:
+    when: always
+    paths:
+      - app/junit.xml
+    reports: 
+      junit: app/junit.xml
+
+build_image:
+  stage: build
+  tags:
+    - ec2
+    - shell
+    - remote
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:v1.0 .
+
+push_image:
+  stage: build
+  needs:
+    - build_image
+  tags:
+    - ec2
+    - shell
+    - remote
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY_IMAGE
+  script:
+    - docker push $CI_REGISTRY_IMAGE:v1.0
+
+deploy_to_dev:
+  stage: deploy
+  tags:
+    - ec2
+    - shell
+    - remote
+  before_script:
+    - chmod 400 $SSH_PRIVATE_KEY
+  script:
+    - ssh -o StrictHostKeyChecking=no -i $SSH_PRIVATE_KEY ec2-user@$SERVER_HOST \
+     "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY_IMAGE && docker run -d -p 3000:3000 $CI_REGISTRY_IMAGE:v1.0"
+
