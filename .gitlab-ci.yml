@@ -6,6 +6,7 @@ workflow:
 
 variables:
   SERVER_HOST: 13.127.12.254
+  URL: http://ec2-65-2-181-36.ap-south-1.compute.amazonaws.com:3000
 
 stages:
   - test
@@ -64,4 +65,7 @@ deploy_to_dev:
   script:
     - ssh -o StrictHostKeyChecking=no -i $SSH_PRIVATE_KEY ec2-user@$SERVER_HOST \
      "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY_IMAGE && docker run -d -p 3000:3000 $CI_REGISTRY_IMAGE:v1.0"
+   environment:
+    name: deployment
+    url: "$URL"
 
